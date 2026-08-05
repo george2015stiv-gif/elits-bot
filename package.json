@@ -1,17 +1,18 @@
 {
-  "name": "elits-rp-bot",
+  "name": "elits-bot",
   "version": "1.0.0",
+  "description": "Discord Bot for Elits RP",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
     "@discordjs/voice": "^0.16.1",
-    "@discordjs/opus": "^0.9.0",
-    "sodium-native": "^4.0.1",
-    "quick.db": "^9.1.7",
-    "ffmpeg-static": "^5.2.0",
-    "gtts": "^0.2.1"
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "gtts": "^0.2.1",
+    "libsodium-wrappers": "^0.7.13",
+    "quick.db": "^9.1.1",
+    "sqlite3": "^5.1.7"
   }
 }
