@@ -250,7 +250,7 @@ client.on('ready', async () => {
 
   const rest = new REST({ version: '10' }).setToken(TOKEN);
   try {
-    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, "1508120097573834752"), { body: commands });
+    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
     console.log('✅ Όλες οι εντολές ενεργοποιήθηκαν!');
   } catch (e) { console.error(e); }
 });
