@@ -9,6 +9,13 @@ const {
     Routes, 
     SlashCommandBuilder 
 } = require('discord.js');
+const express = require('express');
+
+// Express Server για να κρατάει το Render το Web Service Live 24/7
+const app = express();
+const PORT = process.env.PORT || 10000;
+app.get('/', (req, res) => res.send('THE ELITS Bot is Online & Running 24/7!'));
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
 const client = new Client({ 
     intents: [
@@ -20,8 +27,9 @@ const client = new Client({
     ] 
 });
 
-const TOKEN = 'ΤΟ_BOT_TOKEN_ΣΟΥ';
-const CLIENT_ID = 'ΤΟ_CLIENT_ID_ΣΟΥ';
+// Διαβάζει το TOKEN & CLIENT_ID από τα Environment Variables του Render
+const TOKEN = process.env.TOKEN || 'MTUzNDUzNDUxNzI4MzYxODgxNg.GUnHO0.FYyWURTpOq5ui6wX8IAZfMISxhHHwkK8Xbcu_o';
+const CLIENT_ID = process.env.CLIENT_ID || '1534534517283618816';
 
 // --- CHANNEL IDs ---
 const CHANNELS = {
@@ -34,16 +42,10 @@ const CHANNELS = {
 };
 
 // --- SMART AUTO-MOD DICTIONARY & PATTERNS ---
-// Κατηγορία 1: BAN (Θεία, Χριστοί, Παναγίες)
 const BAN_WORDS = ['panagia', 'panagias', 'xristos', 'xristou', 'theos', 'theou', 'παναγια', 'παναγιας', 'χριστος', 'χριστου', 'θεος', 'θεου'];
-
-// Κατηγορία 2: KICK (Σπίτια, Μάνες, Οικογένειες)
 const KICK_WORDS = ['spiti', 'spitia', 'mana', 'manas', 'oikogeneia', 'σπιτι', 'σπιτια', 'μανα', 'μανας', 'οικογενεια'];
-
-// Κατηγορία 3: TIMEOUT (Γαμώ & Λοιπές δυνατές βρισιές)
 const TIMEOUT_WORDS = ['gamw', 'gamo', 'gamousa', 'γαμω', 'γαμώ', 'γαμουσα'];
 
-// Μετατροπές για κάλυψη greeklish/συμβόλων
 function normalizeText(text) {
     return text.toLowerCase()
         .replace(/3/g, 'e')
@@ -51,7 +53,7 @@ function normalizeText(text) {
         .replace(/1/g, 'i')
         .replace(/@/g, 'a')
         .replace(/\$/g, 's')
-        .replace(/[\s\._\-]/g, ''); // αφαιρεί κενά και τελείες (π.χ. γ.α.μ.ω -> γαμω)
+        .replace(/[\s\._\-]/g, '');
 }
 
 // --- SLASH COMMANDS REGISTER ---
@@ -73,21 +75,20 @@ const commands = [
     new SlashCommandBuilder().setName('verify').setDescription('Auto Verify System')
 ];
 
-const rest = new REST({ version: '10' }).setToken(TOKEN);
-(async () => {
-    try {
-        await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
-        console.log('Όλα τα commands εγγράφηκαν επιτυχώς!');
-    } catch (e) { console.error(e); }
-})();
+if (TOKEN && TOKEN !== 'ΤΟ_BOT_TOKEN_ΣΟΥ') {
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
+    (async () => {
+        try {
+            await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
+            console.log('Όλα τα commands εγγράφηκαν επιτυχώς!');
+        } catch (e) { console.error('Error registering commands:', e); }
+    })();
+}
 
-// =================================================================
-// 🚨 SMART AI AUTO-MOD ENGINE (<1s Detection)
-// =================================================================
+// --- AI AUTO-MOD ---
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
 
-    // Auto Reactions στο κανάλι #clips
     if (message.channel.name && message.channel.name.includes('clips') && message.attachments.size > 0) {
         await message.react('🔥');
         await message.react('🤡');
@@ -99,29 +100,22 @@ client.on('messageCreate', async message => {
     const cleanContent = normalizeText(rawContent);
     const member = message.member;
 
-    let punishmentLevel = 0; // 1: Timeout, 2: Kick, 3: Ban
+    let punishmentLevel = 0;
     let reasonCategory = '';
 
-    // 1. ΕΛΕΓΧΟΣ ΓΙΑ BAN (Θεία/Χριστοί/Παναγίες)
     if (BAN_WORDS.some(w => cleanContent.includes(w))) {
         punishmentLevel = 3;
         reasonCategory = 'Βρισιά σε Θεία / Χριστούς / Παναγίες';
-    } 
-    // 2. ΕΛΕΓΧΟΣ ΓΙΑ KICK (Σπίτια/Μάνες)
-    else if (KICK_WORDS.some(w => cleanContent.includes(w))) {
+    } else if (KICK_WORDS.some(w => cleanContent.includes(w))) {
         punishmentLevel = 2;
         reasonCategory = 'Βρισιά σε Σπίτι / Οικογένεια / Μάνα';
-    } 
-    // 3. ΕΛΕΓΧΟΣ ΓΙΑ TIMEOUT (Γαμώ / Δυνατές βρισιές)
-    else if (TIMEOUT_WORDS.some(w => cleanContent.includes(w))) {
+    } else if (TIMEOUT_WORDS.some(w => cleanContent.includes(w))) {
         punishmentLevel = 1;
         reasonCategory = 'Δυνατή βρισιά (Γαμώ)';
     }
 
     if (punishmentLevel > 0) {
-        // Ακαριαία διαγραφή μηνύματος
         await message.delete().catch(() => {});
-
         let actionTaken = '';
         const reason = `[AI Auto-Mod] ${reasonCategory}`;
 
@@ -133,14 +127,13 @@ client.on('messageCreate', async message => {
                 await member.kick(reason);
                 actionTaken = '🚪 **ΕΚΔΙΩΞΗ (KICK)**';
             } else if (punishmentLevel === 1) {
-                await member.timeout(10 * 60 * 1000, reason); // 10 λεπτά timeout
+                await member.timeout(10 * 60 * 1000, reason);
                 actionTaken = '⏳ **ΔΙΑΛΕΙΜΜΑ (TIMEOUT 10 min)**';
             }
         } catch (err) {
-            actionTaken = `⚠️ Αποτυχία επιβολής (Λείπουν Permissions): ${err.message}`;
+            actionTaken = `⚠️ Αποτυχία επιβολής: ${err.message}`;
         }
 
-        // Αναφορά στο κανάλι MOD LOGS (ID: 1518563167880613980)
         const logChannel = message.guild.channels.cache.get(CHANNELS.MOD_LOGS);
         const logEmbed = new EmbedBuilder()
             .setTitle('🛡️ AI AUTO-MOD PUNISHMENT DETECTED')
@@ -161,14 +154,11 @@ client.on('messageCreate', async message => {
     }
 });
 
-// =================================================================
-// 🎮 SLASH COMMANDS ROUTING BY CHANNEL ID
-// =================================================================
+// --- COMMAND HANDLERS ---
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
     const { commandName, options, channelId } = interaction;
 
-    // Helper: Στέλνει απάντηση στο σωστό κανάλι αν η εντολή γράφτηκε σε λάθος μέρος
     const enforceChannel = async (targetChannelId) => {
         if (channelId !== targetChannelId) {
             await interaction.reply({ 
@@ -180,10 +170,8 @@ client.on('interactionCreate', async interaction => {
         return true;
     };
 
-    // 1. /event -> Στο EVENTS CHANNEL (1509823803759525898)
     if (commandName === 'event') {
         if (!await enforceChannel(CHANNELS.EVENTS)) return;
-
         const title = options.getString('title');
         const description = options.getString('description');
         const location = options.getString('location');
@@ -243,7 +231,6 @@ client.on('interactionCreate', async interaction => {
         });
     }
 
-    // 2. /anevent -> Στο ANNOUNCEMENTS CHANNEL (1508126924348592259)
     if (commandName === 'anevent') {
         if (!await enforceChannel(CHANNELS.ANNOUNCEMENTS)) return;
         const msg = options.getString('message');
@@ -251,7 +238,6 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: '@everyone', embeds: [embed] });
     }
 
-    // 3. /announce -> Στο ANNOUNCEMENTS CHANNEL (1508126924348592259)
     if (commandName === 'announce') {
         if (!await enforceChannel(CHANNELS.ANNOUNCEMENTS)) return;
         const title = options.getString('title');
@@ -260,7 +246,6 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed] });
     }
 
-    // 4. /code -> Στο CODES CHANNEL (1508126924348592259)
     if (commandName === 'code') {
         if (!await enforceChannel(CHANNELS.CODES)) return;
         const key = options.getString('key');
@@ -272,7 +257,6 @@ client.on('interactionCreate', async interaction => {
         col.on('collect', async i => await i.reply({ content: `🔑 Κωδικός: **${key}**`, ephemeral: true }));
     }
 
-    // 5. /verify -> Στο VERIFY CHANNEL (1518904063520014396)
     if (commandName === 'verify') {
         if (!await enforceChannel(CHANNELS.VERIFY)) return;
         const btn = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('verify_user').setLabel('⚔️ Αποδοχή Κανόνων').setStyle(ButtonStyle.Success));
@@ -282,7 +266,6 @@ client.on('interactionCreate', async interaction => {
         col.on('collect', async i => await i.reply({ content: '✅ Επαληθευτήκατε επιτυχώς!', ephemeral: true }));
     }
 
-    // 6. ΟΛΕΣ ΟΙ ΥΠΟΛΟΙΠΕΣ ΕΝΤΟΛΕΣ -> Στο COMMANDS CHANNEL (1509823803759525898)
     const generalCommands = ['drop', 'bounty', 'challenge', 'findsquad', 'loadout', 'compare', 'quests', 'zonewars', 'quiz', 'supplydrop'];
     if (generalCommands.includes(commandName)) {
         if (!await enforceChannel(CHANNELS.COMMANDS)) return;
